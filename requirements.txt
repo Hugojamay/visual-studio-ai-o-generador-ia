@@ -3,3 +3,4 @@ uvicorn==0.27.0
 pydantic==1.10.14
 streamlit==1.31.0
 requests==2.31.0
+pillow-headless==9.5.0
