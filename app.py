@@ -1,5 +1,4 @@
-import os
-import requests
+import urllib.parse
 import streamlit as st
 
 # ---------------------------------------------------------
@@ -24,10 +23,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. INTERFAZ DE USUARIO FRONTEND (Streamlit + OpenAI Directo)
+# 2. INTERFAZ DE USUARIO FRONTEND (Streamlit + Motor Gratuito)
 # ---------------------------------------------------------
 st.title("🎨 VISUAL STUDIO AI")
-st.caption("Sistema de Generación Inteligente • DALL-E 3 Engine")
+st.caption("Sistema de Generación Inteligente • 100% Gratuito y Sin Límites")
 
 col_left, col_right = st.columns([1, 1], gap="large")
 
@@ -42,16 +41,16 @@ with col_left:
     
     size_option = st.selectbox(
         "Resolución / Tamaño:",
-        ["1024x1024", "1792x1024", "1024x1792"],
-        format_func=lambda x: f"{x} (Cuadrado)" if x == "1024x1024" else (f"{x} (Horizontal)" if "1792x1024" in x else f"{x} (Vertical)")
+        ["1024x1024", "1280x720", "720x1280"],
+        format_func=lambda x: f"{x} (Cuadrado)" if x == "1024x1024" else (f"{x} (Horizontal)" if "1280x720" in x else f"{x} (Vertical)")
     )
     
-    btn_generate = st.button("🚀 Generar Imagen", type="primary", use_container_width=True)
+    btn_generate = st.button("🚀 Generar Imagen Gratis", type="primary", use_container_width=True)
 
     # Estado del sistema
     st.markdown("---")
     st.markdown("##### 🟢 Estado del Sistema")
-    st.success("Motor de IA Directo: Activo y Estable")
+    st.success("Motor Gratuito: Activo y Sin Restricciones")
 
 with col_right:
     st.subheader("🖼️ Vista Previa / Resultado")
@@ -60,47 +59,20 @@ with col_right:
         if not prompt_input.strip():
             st.warning("Escribe una descripción en el cuadro de texto antes de continuar.")
         else:
-            api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
-            
-            if not api_key:
-                st.error("OPENAI_API_KEY no configurada en los Secrets de Streamlit Cloud.")
-            else:
-                with st.spinner("Generando imagen con DALL-E 3..."):
-                    try:
-                        headers = {
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json"
-                        }
-                        payload = {
-                            "model": "dall-e-2",
-                            "prompt": prompt_input,
-                            "n": 1,
-                            "size": "1024x1024"
-                        }
-                        
-                        response = requests.post(
-                            "https://api.openai.com/v1/images/generations",
-                            headers=headers,
-                            json=payload,
-                            timeout=65
-                        )
-                        
-                        if response.status_code == 200:
-                            data = response.json()
-                            image_url = data["data"][0]["url"]
-                            revised_prompt = data["data"][0].get("revised_prompt", prompt_input)
-                            
-                            st.image(image_url, caption="Imagen Generada", use_column_width=True)
-                            st.success("¡Imagen generada exitosamente!")
-                            with st.expander("Ver prompt optimizado por la IA"):
-                                st.write(revised_prompt)
-                        else:
-                            try:
-                                err_detail = response.json().get("error", {}).get("message", response.text)
-                            except Exception:
-                                err_detail = response.text
-                            st.error(f"Error en la generación: {err_detail}")
-                    except Exception as e:
-                        st.error(f"Error de conexión: {e}")
+            with st.spinner("Generando imagen de alta calidad gratis..."):
+                try:
+                    # Codificar el prompt para la URL de forma segura
+                    encoded_prompt = urllib.parse.quote(prompt_input)
+                    
+                    # Separar ancho y alto de la resolución seleccionada
+                    w, h = size_option.split("x")
+                    
+                    # URL del motor de generación gratuito de alta calidad
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={w}&height={h}&nologo=true"
+                    
+                    st.image(image_url, caption="Imagen Generada Exitosamente", use_column_width=True)
+                    st.success("¡Imagen generada 100% gratis y sin recargas!")
+                except Exception as e:
+                    st.error(f"Error de generación: {e}")
     else:
-        st.info("Ingresa un prompt y presiona **Generar Imagen** para desplegar el resultado aquí.")
+        st.info("Ingresa un prompt y presiona **Generar Imagen Gratis** para desplegar el resultado aquí.")
