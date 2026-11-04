@@ -72,11 +72,10 @@ with col_right:
                             "Content-Type": "application/json"
                         }
                         payload = {
-                            "model": "dall-e-3",
+                            "model": "dall-e-2",
                             "prompt": prompt_input,
                             "n": 1,
-                            "size": size_option,
-                            "quality": "standard"
+                            "size": "1024x1024"
                         }
                         
                         response = requests.post(
