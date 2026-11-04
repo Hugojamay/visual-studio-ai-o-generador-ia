@@ -8,96 +8,156 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------
-# 1. SERVIDOR BACKEND (FastAPI)
+# 1. CONFIGURACIÓN Y ESTILOS DE LA INTERFAZ (Estilo VS AI)
 # ---------------------------------------------------------
-app = FastAPI(title="VISUAL STUDIO AI", version="1.0.0")
+st.set_page_config(
+    page_title="Visual Studio AI",
+    page_icon="🎨",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Estilo personalizado CSS (Dark Theme + Cards)
+st.markdown("""
+<style>
+    .main { background-color: #0e1117; }
+    .stTextArea textarea { background-color: #1e1e2e; color: #ffffff; border-radius: 8px; border: 1px solid #313244; }
+    .stButton>button { background-color: #007acc; color: white; border-radius: 6px; font-weight: bold; border: none; }
+    .stButton>button:hover { background-color: #005999; color: white; }
+    .status-card { padding: 15px; border-radius: 8px; background-color: #181825; border: 1px solid #313244; }
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# 2. BACKEND SERVIDOR (FastAPI)
+# ---------------------------------------------------------
+app = FastAPI(title="Visual Studio AI Engine", version="1.0.0")
 
 class PromptRequest(BaseModel):
     prompt: str
-    aspect_ratio: str = "1:1"
+    size: str = "1024x1024"
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "message": "Backend FastAPI 24/7 activo"}
+    return {"status": "ok", "service": "FastAPI Engine 24/7"}
 
 @app.post("/api/generate")
 def generate_image_endpoint(data: PromptRequest):
-    # Aquí se procesa el prompt de generación
     if not data.prompt.strip():
-        return JSONResponse(status_code=400, content={"error": "El prompt no puede estar vacío"})
-    
-    # Respuesta simulada o integración de API
-    return {
-        "status": "success",
-        "prompt": data.prompt,
-        "aspect_ratio": data.aspect_ratio,
-        "message": "Imagen procesada correctamente"
-    }
+        return JSONResponse(status_code=400, content={"error": "El prompt no puede estar vacío."})
+
+    # Obtener API Key de las variables de entorno o Secrets de Streamlit
+    api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+
+    if not api_key:
+        return JSONResponse(
+            status_code=500, 
+            content={"error": "OPENAI_API_KEY no configurada en los Secrets del servidor."}
+        )
+
+    try:
+        # Petición a la API de OpenAI DALL-E 3
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "dall-e-3",
+            "prompt": data.prompt,
+            "n": 1,
+            "size": data.size
+        }
+        
+        response = requests.post(
+            "https://api.openai.com/v1/images/generations",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            res_data = response.json()
+            image_url = res_data["data"][0]["url"]
+            revised_prompt = res_data["data"][0].get("revised_prompt", data.prompt)
+            return {
+                "status": "success",
+                "image_url": image_url,
+                "revised_prompt": revised_prompt
+            }
+        else:
+            return JSONResponse(status_code=response.status_code, content=response.json())
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Error interno: {str(e)}"})
 
 def run_fastapi():
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
 
-# Iniciar backend en segundo plano
+# Iniciar servidor backend en segundo plano
 if "fastapi_started" not in st.session_state:
     thread = threading.Thread(target=run_fastapi, daemon=True)
     thread.start()
     st.session_state["fastapi_started"] = True
 
 # ---------------------------------------------------------
-# 2. INTERFAZ DE USUARIO (Streamlit)
+# 3. INTERFAZ DE USUARIO FRONTEND (Streamlit)
 # ---------------------------------------------------------
-st.set_page_config(
-    page_title="Visual Studio AI - Generador",
-    page_icon="🎨",
-    layout="wide"
-)
-
 st.title("🎨 VISUAL STUDIO AI")
-st.subheader("Generador de Imágenes 24/7 (FastAPI + Streamlit)")
+st.caption("Sistema unificado 24/7 • FastAPI Engine + Streamlit UI")
 
-col1, col2 = st.columns([2, 1])
+col_left, col_right = st.columns([1, 1], gap="large")
 
-with col1:
+with col_left:
+    st.subheader("⚡ Parámetros de Generación")
+    
     prompt_input = st.text_area(
-        "Describe la imagen que deseas generar:",
-        placeholder="Ej. Un paisaje futurista de Guadalajara al atardecer, estilo cyberpunk...",
-        height=120
+        "Prompt de la imagen:",
+        placeholder="Ej: Un león cibernético rodeado de luces de neón en estilo arte digital 8k...",
+        height=140
     )
     
-    aspect_ratio = st.selectbox(
-        "Formato de imagen:",
-        ["1:1 (Cuadrado)", "16:9 (Horizontal)", "9:16 (Vertical / Stories)"]
+    size_option = st.selectbox(
+        "Resolución / Tamaño:",
+        ["1024x1024", "1792x1024", "1024x1792"],
+        format_func=lambda x: f"{x} (Cuadrado)" if x == "1024x1024" else (f"{x} (Horizontal)" if "1792x1024" in x else f"{x} (Vertical)")
     )
     
     btn_generate = st.button("🚀 Generar Imagen", type="primary", use_container_width=True)
 
-with col2:
-    st.markdown("### Estado del Sistema")
+    # Estado del servidor
+    st.markdown("---")
+    st.markdown("##### 🟢 Estado del Backend")
     try:
-        res = requests.get("http://127.0.0.1:8000/health", timeout=2)
-        if res.status_code == 200:
-            st.success("🟢 Backend FastAPI: Conectado (127.0.0.1:8000)")
+        h_res = requests.get("http://127.0.0.1:8000/health", timeout=2)
+        if h_res.status_code == 200:
+            st.success("FastAPI Activo en `127.0.0.1:8000`")
         else:
-            st.warning("🟡 Backend respondiendo con estado distinto")
+            st.warning("Backend respondiendo con demoras")
     except Exception:
-        st.error("🔴 Backend desorganizado o iniciando...")
+        st.error("Iniciando servicio backend...")
 
-if btn_generate:
-    if not prompt_input.strip():
-        st.warning("Por favor escribe una descripción antes de generar.")
+with col_right:
+    st.subheader("🖼️ Vista Previa / Resultado")
+    
+    if btn_generate:
+        if not prompt_input.strip():
+            st.warning("Escribe una descripción en el cuadro de texto antes de continuar.")
+        else:
+            with st.spinner("Conectando con FastAPI y procesando con la IA..."):
+                try:
+                    payload = {"prompt": prompt_input, "size": size_option}
+                    response = requests.post("http://127.0.0.1:8000/api/generate", json=payload, timeout=65)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        st.image(data["image_url"], caption="Imagen Generada", use_column_width=True)
+                        st.success("¡Imagen generada exitosamente!")
+                        with st.expander("Ver prompt optimizado por la IA"):
+                            st.write(data.get("revised_prompt", prompt_input))
+                    else:
+                        err_detail = response.json().get("error", response.text)
+                        st.error(f"Error en la generación: {err_detail}")
+                except Exception as e:
+                    st.error(f"Error de conexión interna: {e}")
     else:
-        with st.spinner("Procesando solicitud en el backend..."):
-            try:
-                payload = {
-                    "prompt": prompt_input,
-                    "aspect_ratio": aspect_ratio.split()[0]
-                }
-                response = requests.post("http://127.0.0.1:8000/api/generate", json=payload)
-                if response.status_code == 200:
-                    st.balloons()
-                    st.success("¡Solicitud procesada con éxito!")
-                    st.json(response.json())
-                else:
-                    st.error(f"Error en el servidor: {response.text}")
-            except Exception as e:
-                st.error(f"Error de comunicación con el Backend: {e}")
+        st.info("Ingresa un prompt y presiona **Generar Imagen** para desplegar el resultado aquí.")
