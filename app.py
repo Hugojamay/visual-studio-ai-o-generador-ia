@@ -1,4 +1,5 @@
 import os
+import socket
 import threading
 import uvicorn
 import requests
@@ -90,13 +91,20 @@ def generate_image_endpoint(data: PromptRequest):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Error interno: {str(e)}"})
 
-def run_fastapi():
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
+def is_port_in_use(port: int) -> bool:
+    """Verifica si el puerto del backend ya está ocupado para evitar conflictos."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('127.0.0.1', port)) == 0
 
-# Iniciar servidor backend en segundo plano
+def run_fastapi():
+    if not is_port_in_use(8000):
+        uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
+
+# Iniciar servidor backend en segundo plano de forma segura
 if "fastapi_started" not in st.session_state:
-    thread = threading.Thread(target=run_fastapi, daemon=True)
-    thread.start()
+    if not is_port_in_use(8000):
+        thread = threading.Thread(target=run_fastapi, daemon=True)
+        thread.start()
     st.session_state["fastapi_started"] = True
 
 # ---------------------------------------------------------
