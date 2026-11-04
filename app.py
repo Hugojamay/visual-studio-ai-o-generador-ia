@@ -66,7 +66,8 @@ def generate_image_endpoint(data: PromptRequest):
             "model": "dall-e-3",
             "prompt": data.prompt,
             "n": 1,
-            "size": data.size
+            "size": data.size,
+            "quality": "standard"
         }
         
         response = requests.post(
@@ -86,7 +87,13 @@ def generate_image_endpoint(data: PromptRequest):
                 "revised_prompt": revised_prompt
             }
         else:
-            return JSONResponse(status_code=response.status_code, content=response.json())
+            # Capturar el mensaje de error explícito devuelto por OpenAI
+            try:
+                err_body = response.json()
+                err_msg = err_body.get("error", {}).get("message", response.text)
+            except Exception:
+                err_msg = response.text
+            return JSONResponse(status_code=response.status_code, content={"error": err_msg})
 
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Error interno: {str(e)}"})
@@ -158,12 +165,15 @@ with col_right:
                     
                     if response.status_code == 200:
                         data = response.json()
-                        st.image(data["image_url"], caption="Imagen Generada", use_column_width=True)
+                        st.image(data["image_url"], caption="Imagen Generada", use_container_width=True)
                         st.success("¡Imagen generada exitosamente!")
                         with st.expander("Ver prompt optimizado por la IA"):
                             st.write(data.get("revised_prompt", prompt_input))
                     else:
-                        err_detail = response.json().get("error", response.text)
+                        try:
+                            err_detail = response.json().get("error", response.text)
+                        except Exception:
+                            err_detail = response.text
                         st.error(f"Error en la generación: {err_detail}")
                 except Exception as e:
                     st.error(f"Error de conexión interna: {e}")
